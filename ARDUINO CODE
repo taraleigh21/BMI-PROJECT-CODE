@@ -1,0 +1,45 @@
+//ARDUINO CODE 
+
+#include <SPI.h>
+#include <ADXL362.h>
+
+ADXL362 accelerometer; // Create the accelerometer object
+
+int16_t xOffset = -114; // Zero-g offset for X-axis
+int16_t yOffset = 44; // Zero-g offset for Y-axis
+int16_t zOffset = -2500 ; // Zero-g offset for Z-axis
+
+int Data = 0;
+void setup()
+{
+  Serial.begin(9600); // Initialize serial communication
+  accelerometer.begin(10); // Initialize the accelerometer (CS pin)
+  accelerometer.beginMeasure(); // Switch ADXL362 to measure mode
+  // You can set the offsets here or calculate them dynamically during setup
+}
+
+void loop()
+{
+  // Read accelerometer data
+  int x, y, z, t;
+  accelerometer.readXYZTData(x, y, z, t);
+
+  // Apply zero-g offset correction
+  x -= xOffset;
+  y -= yOffset;
+  z -= zOffset-1;
+
+  // Convert raw data to calibrated acceleration (in g-force)
+  float xAccel = x / 4096.0;
+  float yAccel = y / 4096.0;
+  float zAccel = z / 4096.0;
+
+  
+// Display calibrated data in g
+  Serial.print(xAccel , 4); 
+  Serial.print(","); //Y:
+  Serial.print(yAccel , 4);
+  Serial.print(","); //Z: 
+  Serial.println(zAccel , 4);
+
+  delay(50);
