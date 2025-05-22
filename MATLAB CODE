@@ -1,0 +1,105 @@
+
+//MATLAB CODE
+
+samples = 500;
+
+% Connect to the serial port
+device = serialport("COM3", 9600);
+flush(device); % Clear any old data
+
+% Preallocate for performance
+xVals = zeros(1, samples);
+yVals = zeros(1, samples);
+zVals = zeros(1, samples);
+
+% Start data capture
+disp("Reading data from Arduino...");
+count = 0;
+while count < samples
+   rawLine = readline(device); % Read a line of serial data
+   data = str2double(split(strtrim(rawLine), ',')); % Split and convert to numbers
+   if numel(data) == 3 && all(~isnan(data))   % Check valid line
+       count = count + 1;
+       xVals(count) = data(1);
+       yVals(count) = data(2);
+       zVals(count) = data(3);
+       fprintf("X: %.4f, Y: %.4f, Z: %.4f\n", data(1), data(2), data(3));
+   end
+end
+
+% Clean up
+clear device;
+
+% Sampling frequency (Hz)
+fs = 50;
+fc = 5;
+
+% Normalize cutoff frequency
+Wn = fc / (fs / 2);
+
+% Design a 2nd-order Butterworth low-pass filter
+[b, a] = butter(2, Wn);
+
+% Apply the filter to the data
+xFiltered = filtfilt(b, a, xVals);
+yFiltered = filtfilt(b, a, yVals);
+zFiltered = filtfilt(b, a, zVals);
+
+% Time vector
+t = (0:length(xVals)-1) / fs;
+
+% Convert filtered acceleration to m/s^2
+g = 9.81;
+xFilt_mps2 = xFiltered * g;
+yFilt_mps2 = yFiltered * g;
+zFilt_mps2 = zFiltered * g;
+
+% === Compute Velocity ===
+vx = cumtrapz(t, xFilt_mps2);
+vy = cumtrapz(t, yFilt_mps2);
+vz = cumtrapz(t, zFilt_mps2);
+
+
+% === Compute Force ===
+mass = 0.150; % in kg
+Fx = mass * xFilt_mps2;
+Fy = mass * yFilt_mps2;
+Fz = mass * zFilt_mps2;
+Fnet = sqrt(Fx.^2 + Fy.^2 + Fz.^2); % Optional: net force magnitude
+
+%% === Raw Acceleration graphs ===
+figure;
+plot(t, xVals, 'r', t, yVals, 'g', t, zVals, 'b');
+title('Raw Acceleration: X, Y, Z Axes');
+xlabel('Time (s)');
+ylabel('Acceleration (g)');
+legend('X', 'Y', 'Z');
+grid on;
+
+%% === Filtered Acceleration graphs ===
+figure;
+plot(t, xFiltered, 'r', t, yFiltered, 'g', t, zFiltered, 'b');
+title('Filtered Acceleration (g): X, Y, Z Axes');
+xlabel('Time (s)');
+ylabel('Acceleration (g)');
+legend('X', 'Y', 'Z');
+grid on;
+
+%% === Velocity graphs ===
+figure;
+plot(t, vx, 'r', t, vy, 'g', t, vz, 'b');
+title('Velocity: X, Y, Z Axes');
+xlabel('Time (s)');
+ylabel('Velocity (m/s)');
+legend('X', 'Y', 'Z');
+grid on;
+
+
+%% === Net Force Magnitude (Optional) ===
+figure;
+plot(t, Fnet, 'k');
+title('Net Force Magnitude');
+xlabel('Time (s)');
+ylabel('Force (N)');
+grid on;
+
